@@ -7,7 +7,7 @@ interface GoogleAuthContextType {
   loading: boolean;
   connectGoogle: () => void;
   disconnectGoogle: () => Promise<void>;
-  sendEmail: (params: SendEmailParams) => Promise<void>;
+  sendEmail: (params: SendEmailParams) => Promise<{ id: string }>;
 }
 
 interface SendEmailParams {

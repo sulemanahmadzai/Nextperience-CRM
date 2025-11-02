@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, CheckCircle, Eye, Send, Download, Mail, FileText, Printer, FileDown, CreditCard, ShieldCheck, Lock, Unlock, XCircle, AlertCircle } from 'lucide-react';
+import { X, CheckCircle, Eye, Send, Download, Mail, FileText, Printer, FileDown, CreditCard, ShieldCheck, Lock, Unlock, XCircle, AlertCircle, ArrowRight, RefreshCw } from 'lucide-react';
 import html2pdf from 'html2pdf.js';
 import { supabase } from '../../lib/supabase';
 import { useCompany } from '../../contexts/CompanyContext';
@@ -9,6 +9,7 @@ import SignatureModal from './SignatureModal';
 import EmailComposerModal from './EmailComposerModal';
 import PaymentModal from './PaymentModal';
 import PaymentVerificationModal from './PaymentVerificationModal';
+import { useGoogleAuth } from '../../contexts/GoogleAuthContext';
 
 interface QuotationViewProps {
   quotation: Quotation;
@@ -35,7 +36,11 @@ export default function QuotationView({ quotation, onClose }: QuotationViewProps
   const [reopening, setReopening] = useState(false);
   const [acknowledged, setAcknowledged] = useState(false);
   const [acknowledgedName, setAcknowledgedName] = useState('');
+  const [emailMessages, setEmailMessages] = useState<any[]>([]);
+  const [loadingEmails, setLoadingEmails] = useState(false);
+  const [showEmailReplies, setShowEmailReplies] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
+  const { isConnected } = useGoogleAuth();
 
   const canUpdate = permissions?.quotations?.update ?? false;
   const isAdmin = permissions?.role?.name === 'Admin';
@@ -45,6 +50,7 @@ export default function QuotationView({ quotation, onClose }: QuotationViewProps
   useEffect(() => {
     if (permissions) {
       loadDetails();
+      loadEmailMessages();
     }
   }, [permissions]);
 
@@ -105,6 +111,168 @@ export default function QuotationView({ quotation, onClose }: QuotationViewProps
     }
 
     setLoading(false);
+  };
+
+  const loadEmailMessages = async () => {
+    if (!permissions?.quotations?.read) return;
+    
+    setLoadingEmails(true);
+    try {
+      const { data } = await supabase
+        .from('email_messages')
+        .select('*')
+        .eq('quotation_id', quotation.id)
+        .order('sent_at', { ascending: false, nullsFirst: false })
+        .order('created_at', { ascending: false });
+
+      if (data) {
+        setEmailMessages(data);
+      }
+    } catch (error) {
+      console.error('Error loading email messages:', error);
+    } finally {
+      setLoadingEmails(false);
+    }
+  };
+
+  const fetchGmailReplies = async () => {
+    if (!isConnected || !user) {
+      alert('Please connect your Google account to fetch email replies');
+      return;
+    }
+
+    setLoadingEmails(true);
+    try {
+      // Get Gmail message IDs from our stored emails
+      const sentEmails = emailMessages.filter(e => e.direction === 'outbound' && e.gmail_message_id);
+      
+      if (sentEmails.length === 0) {
+        alert('No sent emails found with Gmail message IDs');
+        setLoadingEmails(false);
+        return;
+      }
+
+      // Get access token
+      const { data: tokenData } = await supabase
+        .from('google_tokens')
+        .select('access_token, refresh_token, expires_at')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (!tokenData) throw new Error('No Google token found');
+
+      let accessToken = tokenData.access_token;
+      const expiresAt = new Date(tokenData.expires_at);
+
+      if (expiresAt <= new Date()) {
+        // Refresh token would be handled by GoogleAuthContext
+        alert('Please refresh your Google connection');
+        setLoadingEmails(false);
+        return;
+      }
+
+      // For each sent email, check for replies using Gmail API
+      const replies: any[] = [];
+      
+      for (const sentEmail of sentEmails) {
+        try {
+          // Search for replies to this email thread
+          const searchQuery = `inreplyto:${sentEmail.gmail_message_id} OR references:${sentEmail.gmail_message_id}`;
+          const response = await fetch(
+            `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(searchQuery)}`,
+            {
+              headers: {
+                'Authorization': `Bearer ${accessToken}`,
+              },
+            }
+          );
+
+          if (response.ok) {
+            const data = await response.json();
+            if (data.messages && data.messages.length > 0) {
+              // Fetch full message details
+              for (const msg of data.messages.slice(0, 5)) { // Limit to 5 most recent
+                const msgResponse = await fetch(
+                  `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}`,
+                  {
+                    headers: {
+                      'Authorization': `Bearer ${accessToken}`,
+                    },
+                  }
+                );
+
+                if (msgResponse.ok) {
+                  const msgData = await msgResponse.json();
+                  const headers = msgData.payload.headers;
+                  const from = headers.find((h: any) => h.name === 'From')?.value || '';
+                  const subject = headers.find((h: any) => h.name === 'Subject')?.value || '';
+                  const date = headers.find((h: any) => h.name === 'Date')?.value || '';
+                  
+                  // Extract body
+                  let body = '';
+                  if (msgData.payload.body?.data) {
+                    body = atob(msgData.payload.body.data.replace(/-/g, '+').replace(/_/g, '/'));
+                  } else if (msgData.payload.parts) {
+                    for (const part of msgData.payload.parts) {
+                      if (part.mimeType === 'text/plain' && part.body?.data) {
+                        body = atob(part.body.data.replace(/-/g, '+').replace(/_/g, '/'));
+                        break;
+                      }
+                    }
+                  }
+
+                  // Check if we already have this reply
+                  const existingReply = emailMessages.find(
+                    e => e.gmail_message_id === msg.id || (e.from_address === from && e.subject === subject)
+                  );
+
+                  if (!existingReply && body) {
+                    // Store the reply
+                    await supabase.from('email_messages').insert({
+                      company_id: currentCompany?.id,
+                      quotation_id: quotation.id,
+                      direction: 'inbound',
+                      from_address: from,
+                      to_addresses: [user.email || ''],
+                      subject: subject,
+                      body: body.substring(0, 5000), // Limit body length
+                      entity_type: 'quotation',
+                      entity_id: quotation.id,
+                      gmail_message_id: msg.id,
+                      status: 'sent',
+                      sent_at: date,
+                      recipient_email: user.email || '',
+                    } as any);
+
+                    replies.push({
+                      from,
+                      subject,
+                      body,
+                      date,
+                      gmail_message_id: msg.id,
+                    });
+                  }
+                }
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching replies for email:', sentEmail.id, error);
+        }
+      }
+
+      if (replies.length > 0) {
+        alert(`Found ${replies.length} new reply(ies)`);
+        await loadEmailMessages();
+      } else {
+        alert('No new replies found');
+      }
+    } catch (error: any) {
+      console.error('Error fetching Gmail replies:', error);
+      alert('Failed to fetch email replies: ' + error.message);
+    } finally {
+      setLoadingEmails(false);
+    }
   };
 
   const formatCurrency = (value: number) => {
@@ -772,6 +940,68 @@ export default function QuotationView({ quotation, onClose }: QuotationViewProps
                         <span className="font-medium">Date:</span> {formatDate(quotation.signed_at)}
                       </p>
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {emailMessages.length > 0 && (
+                <div className="mb-8 border-t-2 border-slate-200 pt-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-sm font-semibold text-slate-900">Email Communication</h3>
+                    {isConnected && (
+                      <button
+                        onClick={fetchGmailReplies}
+                        disabled={loadingEmails}
+                        className="flex items-center gap-2 px-3 py-1.5 text-xs bg-blue-100 hover:bg-blue-200 text-blue-700 rounded disabled:opacity-50"
+                      >
+                        <RefreshCw className={`w-3 h-3 ${loadingEmails ? 'animate-spin' : ''}`} />
+                        Check for Replies
+                      </button>
+                    )}
+                  </div>
+                  <div className="space-y-3">
+                    {emailMessages.map((email) => (
+                      <div
+                        key={email.id}
+                        className={`p-4 rounded-lg border ${
+                          email.direction === 'outbound'
+                            ? 'bg-blue-50 border-blue-200'
+                            : 'bg-green-50 border-green-200'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <Mail className={`w-4 h-4 ${
+                              email.direction === 'outbound' ? 'text-blue-600' : 'text-green-600'
+                            }`} />
+                            <span className={`text-xs font-medium px-2 py-0.5 rounded ${
+                              email.direction === 'outbound'
+                                ? 'bg-blue-100 text-blue-700'
+                                : 'bg-green-100 text-green-700'
+                            }`}>
+                              {email.direction === 'outbound' ? 'Sent' : 'Received'}
+                            </span>
+                            {email.direction === 'outbound' && (
+                              <span className="text-xs text-slate-600">
+                                To: {Array.isArray(email.to_addresses) ? email.to_addresses.join(', ') : email.recipient_email}
+                              </span>
+                            )}
+                            {email.direction === 'inbound' && (
+                              <span className="text-xs text-slate-600">
+                                From: {email.from_address}
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-xs text-slate-500">
+                            {email.sent_at ? formatDate(email.sent_at) : formatDate(email.created_at)}
+                          </span>
+                        </div>
+                        <h4 className="font-medium text-slate-900 mb-1">{email.subject}</h4>
+                        <p className="text-sm text-slate-700 line-clamp-3 whitespace-pre-wrap">
+                          {email.body || 'No content'}
+                        </p>
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}

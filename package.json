@@ -8,7 +8,19 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit -p tsconfig.app.json"
+    "typecheck": "tsc --noEmit -p tsconfig.app.json",
+    "migrate:export-data": "node scripts/export-data.js",
+    "migrate:export-storage": "node scripts/export-storage.js",
+    "migrate:export-auth": "node scripts/export-auth-users.js",
+    "migrate:export-all": "npm run migrate:export-data && npm run migrate:export-storage && (npm run migrate:export-auth || echo '⚠️ Auth export failed - you can still proceed with data migration')",
+    "migrate:import-data": "node scripts/import-data.js",
+    "migrate:import-storage": "node scripts/import-storage.js",
+    "migrate:auth-users": "node scripts/migrate-auth-users.js",
+    "migrate:create-users": "node scripts/create-users-from-export.js",
+    "migrate:verify-users": "node scripts/verify-users.js",
+    "migrate:import-all": "npm run migrate:import-data && npm run migrate:auth-users && npm run migrate:import-storage",
+    "migrate:import-full": "npm run migrate:create-users && npm run migrate:import-data && npm run migrate:import-storage",
+    "migrate:list": "node scripts/list-migrations.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",
@@ -19,10 +31,12 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.9.1",
+    "@types/node": "^20.10.0",
     "@types/react": "^18.3.5",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",
     "autoprefixer": "^10.4.18",
+    "dotenv": "^16.3.1",
     "eslint": "^9.9.1",
     "eslint-plugin-react-hooks": "^5.1.0-rc.0",
     "eslint-plugin-react-refresh": "^0.4.11",

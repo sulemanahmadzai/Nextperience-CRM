@@ -19,6 +19,7 @@ import { TemplatesPage } from './components/templates/TemplatesPage';
 import { PublicQuotationView } from './components/quotations/PublicQuotationView';
 import { PublicProformaInvoiceView } from './components/proforma/PublicProformaInvoiceView';
 import { ProfilePage } from './components/profile/ProfilePage';
+import { assignCurrentUserToDefaultCompany } from './lib/assignUserToCompany';
 
 function AppContent() {
   const { user, loading: authLoading, signOut } = useAuth();
@@ -27,6 +28,8 @@ function AppContent() {
   const [selectedQuotationId, setSelectedQuotationId] = useState<string | null>(null);
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [editingQuotationId, setEditingQuotationId] = useState<string | null>(null);
+  const [assigning, setAssigning] = useState(false);
+  const [assignMessage, setAssignMessage] = useState<string | null>(null);
 
   useEffect(() => {
     const handleMessage = (e: MessageEvent) => {
@@ -41,7 +44,20 @@ function AppContent() {
     return () => window.removeEventListener('message', handleMessage);
   }, []);
 
+  console.log('[App] Render state:', {
+    authLoading,
+    companyLoading,
+    hasUser: !!user,
+    userId: user?.id,
+    userEmail: user?.email,
+    hasCurrentCompany: !!currentCompany,
+    currentCompanyId: currentCompany?.id,
+    currentCompanyName: currentCompany?.name,
+    companiesCount: 0 // We'll log this from CompanyContext
+  });
+
   if (authLoading || companyLoading) {
+    console.log('[App] Showing loading state');
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <div className="text-slate-600">Loading...</div>
@@ -50,20 +66,60 @@ function AppContent() {
   }
 
   if (!user) {
+    console.log('[App] No user, showing login form');
     return <LoginForm />;
   }
 
+  const handleAssignToCompany = async () => {
+    setAssigning(true);
+    setAssignMessage(null);
+    const result = await assignCurrentUserToDefaultCompany();
+    
+    if (result.success) {
+      setAssignMessage(result.message || 'Success! Refreshing...');
+      // Refresh companies and reload
+      setTimeout(() => {
+        refreshCompanies();
+        window.location.reload();
+      }, 1000);
+    } else {
+      setAssignMessage(`Error: ${result.error}`);
+      setAssigning(false);
+    }
+  };
+
   if (!currentCompany) {
+    console.error('[App] ===== NO COMPANY ACCESS ERROR =====');
+    console.error('[App] User authenticated but no company access');
+    console.error('[App] User details:', {
+      id: user.id,
+      email: user.email
+    });
+
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="text-center">
+        <div className="text-center max-w-md">
           <div className="text-slate-600 mb-4">No company access. Please contact your administrator.</div>
-          <button
-            onClick={signOut}
-            className="text-slate-900 hover:text-slate-700 underline"
-          >
-            Sign out
-          </button>
+          <div className="space-y-3">
+            <button
+              onClick={handleAssignToCompany}
+              disabled={assigning}
+              className="px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {assigning ? 'Assigning...' : 'Auto-Assign to Default Company'}
+            </button>
+            {assignMessage && (
+              <div className={`text-sm ${assignMessage.includes('Error') ? 'text-red-600' : 'text-green-600'}`}>
+                {assignMessage}
+              </div>
+            )}
+            <button
+              onClick={signOut}
+              className="block text-slate-900 hover:text-slate-700 underline text-sm"
+            >
+              Sign out
+            </button>
+          </div>
         </div>
       </div>
     );

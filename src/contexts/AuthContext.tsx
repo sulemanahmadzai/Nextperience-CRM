@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase';
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
+  signIn: (email: string, password: string) => Promise<{ error: Error | null; data?: { user: User | null } }>;
   signUp: (email: string, password: string) => Promise<{ error: Error | null; data?: { user: User | null } }>;
   signOut: () => Promise<void>;
 }
@@ -17,21 +17,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    console.log('[AuthContext] ===== INITIALIZING =====');
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      console.log('[AuthContext] getSession result:', {
+        hasSession: !!session,
+        userId: session?.user?.id,
+        userEmail: session?.user?.email,
+        error,
+        hasError: !!error
+      });
       setUser(session?.user ?? null);
       setLoading(false);
+      console.log('[AuthContext] Initial session check complete');
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('[AuthContext] Auth state changed:', {
+        event,
+        hasSession: !!session,
+        userId: session?.user?.id,
+        userEmail: session?.user?.email
+      });
       setUser(session?.user ?? null);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      console.log('[AuthContext] Cleaning up auth subscription');
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    return { error: error ? new Error(error.message) : null };
+    console.log('[AuthContext] ===== SIGN IN ATTEMPT =====');
+    console.log('[AuthContext] Email:', email);
+    const { error, data } = await supabase.auth.signInWithPassword({ email, password });
+    console.log('[AuthContext] Sign in result:', {
+      success: !error,
+      error: error ? error.message : null,
+      userId: data?.user?.id,
+      userEmail: data?.user?.email,
+      errorDetails: error
+    });
+    return { error: error ? new Error(error.message) : null, data };
   };
 
   const signUp = async (email: string, password: string) => {
