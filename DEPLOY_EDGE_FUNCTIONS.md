@@ -1,9 +1,11 @@
 # Deploy Supabase Edge Functions Guide
 
 ## Problem
+
 When clicking "Connect with Google", you get:
+
 ```json
-{"code":"NOT_FOUND","message":"Requested function was not found"}
+{ "code": "NOT_FOUND", "message": "Requested function was not found" }
 ```
 
 This means the Edge Functions haven't been deployed to your Supabase project.
@@ -13,16 +15,19 @@ This means the Edge Functions haven't been deployed to your Supabase project.
 ### Step 1: Install Supabase CLI
 
 **Option A: Using Homebrew (macOS)**
+
 ```bash
 brew install supabase/tap/supabase
 ```
 
 **Option B: Using npm**
+
 ```bash
 npm install -g supabase
 ```
 
 **Option C: Direct download**
+
 - Visit: https://github.com/supabase/cli/releases
 - Download the binary for your OS
 - Add to PATH
@@ -42,11 +47,13 @@ supabase link --project-ref YOUR_PROJECT_REF
 ```
 
 **To find your Project Ref:**
+
 - Go to your Supabase Dashboard
 - The Project Ref is in your URL: `https://app.supabase.com/project/YOUR_PROJECT_REF`
 - Or it's the subdomain: `YOUR_PROJECT_REF.supabase.co`
 
 **Example:**
+
 ```bash
 supabase link --project-ref oylgvcpwjsfecvspqfrl
 ```
@@ -56,24 +63,43 @@ supabase link --project-ref oylgvcpwjsfecvspqfrl
 Set the required secrets for your Edge Functions:
 
 ```bash
-# Set Google OAuth credentials
+# Set Google OAuth credentials (REQUIRED)
 supabase secrets set GOOGLE_CLIENT_ID=your_google_client_id_here
 supabase secrets set GOOGLE_CLIENT_SECRET=your_google_client_secret_here
 
-# These are automatically set, but verify:
-supabase secrets set SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
-supabase secrets set SUPABASE_ANON_KEY=your_anon_key
-supabase secrets set SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+# These are usually auto-set by Supabase CLI when you link the project
+# You typically DON'T need to set them manually, but can verify:
+# supabase secrets set SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
+# supabase secrets set SUPABASE_ANON_KEY=your_anon_key
+# supabase secrets set SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 ```
 
+**Important Notes:**
+
+- **`GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`** - These are REQUIRED and you MUST set them manually
+- **`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`** - These are usually **automatically set** by Supabase CLI when you link your project
+- You typically **don't need** these in your `.env` file for Edge Functions - they're only needed as secrets
+
 **OR set them via Supabase Dashboard:**
+
 1. Go to **Project Settings** → **Edge Functions** → **Secrets**
-2. Add each secret:
-   - `GOOGLE_CLIENT_ID`
-   - `GOOGLE_CLIENT_SECRET`
-   - `SUPABASE_URL` (usually auto-set)
-   - `SUPABASE_ANON_KEY` (usually auto-set)
-   - `SUPABASE_SERVICE_ROLE_KEY` (usually auto-set)
+2. Add these secrets (only if not auto-set):
+   - `GOOGLE_CLIENT_ID` ⚠️ **REQUIRED - You must set this**
+   - `GOOGLE_CLIENT_SECRET` ⚠️ **REQUIRED - You must set this**
+   - `SUPABASE_URL` (usually auto-set - don't set if already there)
+   - `SUPABASE_ANON_KEY` (usually auto-set - don't set if already there)
+   - `SUPABASE_SERVICE_ROLE_KEY` (usually auto-set - don't set if already there)
+
+**What is `SUPABASE_SERVICE_ROLE_KEY`?**
+
+- It's an **admin key** with full database access (bypasses Row Level Security)
+- Used by Edge Functions to:
+  - Store Google OAuth tokens in the database (`google-oauth-callback`)
+  - Create users via admin API (`create-user`)
+  - Process payment webhooks (`xendit-webhook`)
+- **Don't expose this in frontend code** - only use in server-side/Edge Functions
+- **Where to find it:** Supabase Dashboard → Project Settings → API → "service_role" key (keep it secret!)
+- **You usually DON'T need to set it manually** - Supabase CLI auto-sets it when you link a project
 
 ### Step 5: Deploy All Edge Functions
 
@@ -91,6 +117,7 @@ supabase functions deploy google-oauth-debug
 ```
 
 **Deploy all functions at once:**
+
 ```bash
 supabase functions deploy google-oauth-start
 supabase functions deploy google-oauth-callback
@@ -105,6 +132,7 @@ supabase functions deploy xendit-webhook
 After deployment, verify functions are accessible:
 
 1. **Check in Supabase Dashboard:**
+
    - Go to **Edge Functions** in your Supabase Dashboard
    - You should see all deployed functions listed
 
@@ -131,18 +159,22 @@ After deployment, verify functions are accessible:
 ### Troubleshooting
 
 #### Error: "Function not found"
+
 - ✅ Make sure you've deployed the function: `supabase functions deploy google-oauth-start`
 - ✅ Verify the function name matches exactly
 
 #### Error: "GOOGLE_CLIENT_ID not configured"
+
 - ✅ Set the secret: `supabase secrets set GOOGLE_CLIENT_ID=your_id`
 - ✅ Or set it in Supabase Dashboard → Edge Functions → Secrets
 
 #### Error: "Unauthorized" or 401
+
 - ✅ Make sure you're passing the Authorization header
 - ✅ Use a valid access token from Supabase Auth
 
 #### Error: "redirect_uri_mismatch"
+
 - ✅ Add the exact redirect URI to Google Cloud Console:
   `https://YOUR_PROJECT_REF.supabase.co/functions/v1/google-oauth-callback`
 
@@ -175,6 +207,7 @@ echo "⚠️  Don't forget to set secrets if not already set!"
 ```
 
 Make it executable:
+
 ```bash
 chmod +x deploy-functions.sh
 ./deploy-functions.sh
@@ -193,4 +226,3 @@ If you prefer using the dashboard:
    - Deploy
 
 **Note:** This is more tedious but works if CLI isn't available.
-

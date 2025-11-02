@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
-import { Building2, Users, Plus } from 'lucide-react';
+import { Building2, Users, Plus, Edit2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useCompany } from '../../contexts/CompanyContext';
+import BusinessUnitModal from './BusinessUnitModal';
 
 interface Company {
   id: string;
   name: string;
   slug: string;
+  logo_url: string | null;
   is_active: boolean;
 }
 
@@ -15,9 +17,11 @@ interface BusinessUnitsManagementProps {
 }
 
 export default function BusinessUnitsManagement({ onManageAccess }: BusinessUnitsManagementProps) {
-  const { permissions } = useCompany();
+  const { permissions, hasAllAccess, userRole } = useCompany();
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
 
   useEffect(() => {
     loadCompanies();
@@ -27,13 +31,31 @@ export default function BusinessUnitsManagement({ onManageAccess }: BusinessUnit
     setLoading(true);
     const { data, error } = await supabase
       .from('companies')
-      .select('id, name, slug, is_active')
+      .select('id, name, slug, logo_url, is_active')
       .order('name');
 
     if (!error && data) {
       setCompanies(data);
     }
     setLoading(false);
+  };
+
+  const handleAddBusinessUnit = () => {
+    setSelectedCompany(null);
+    setIsModalOpen(true);
+  };
+
+  const handleEditBusinessUnit = (company: Company) => {
+    setSelectedCompany(company);
+    setIsModalOpen(true);
+  };
+
+  const handleModalClose = (shouldRefresh?: boolean) => {
+    setIsModalOpen(false);
+    setSelectedCompany(null);
+    if (shouldRefresh) {
+      loadCompanies();
+    }
   };
 
   if (loading) {
@@ -53,8 +75,11 @@ export default function BusinessUnitsManagement({ onManageAccess }: BusinessUnit
             Manage business units and their user access
           </p>
         </div>
-        {permissions?.users?.create && (
-          <button className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">
+        {(hasAllAccess || permissions?.settings?.create || permissions?.settings?.update) && (
+          <button 
+            onClick={handleAddBusinessUnit}
+            className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700"
+          >
             <Plus className="w-4 h-4" />
             Add Business Unit
           </button>
@@ -88,16 +113,34 @@ export default function BusinessUnitsManagement({ onManageAccess }: BusinessUnit
               </span>
             </div>
 
-            <button
-              onClick={() => onManageAccess(company.id, company.name)}
-              className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors mt-auto"
-            >
-              <Users className="w-4 h-4" />
-              Manage User Access
-            </button>
+            <div className="flex gap-2 mt-auto">
+              {(hasAllAccess || permissions?.settings?.update) && (
+                <button
+                  onClick={() => handleEditBusinessUnit(company)}
+                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm text-slate-700 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+                >
+                  <Edit2 className="w-4 h-4" />
+                  Edit
+                </button>
+              )}
+              <button
+                onClick={() => onManageAccess(company.id, company.name)}
+                className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors"
+              >
+                <Users className="w-4 h-4" />
+                Manage Access
+              </button>
+            </div>
           </div>
         ))}
       </div>
+
+      {isModalOpen && (
+        <BusinessUnitModal
+          company={selectedCompany}
+          onClose={handleModalClose}
+        />
+      )}
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { FileText, Eye, Search, Plus, AlertCircle } from 'lucide-react';
+import { FileText, Eye, Search, Plus, AlertCircle, Building2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useCompany } from '../../contexts/CompanyContext';
 
@@ -24,7 +24,7 @@ interface ProformaInvoicesPageProps {
 }
 
 export function ProformaInvoicesPage({ onViewInvoice, onConvertFromQuotation }: ProformaInvoicesPageProps) {
-  const { currentCompany, permissions } = useCompany();
+  const { currentCompany, companies, permissions, switchCompany } = useCompany();
   const [invoices, setInvoices] = useState<ProformaInvoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -122,6 +122,23 @@ export function ProformaInvoicesPage({ onViewInvoice, onConvertFromQuotation }: 
                 className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-900 focus:border-transparent"
               />
             </div>
+            {companies.length > 1 && (
+              <select
+                value={currentCompany?.id || ''}
+                onChange={(e) => {
+                  if (e.target.value && switchCompany) {
+                    switchCompany(e.target.value);
+                  }
+                }}
+                className="px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-900 focus:border-transparent"
+              >
+                {companies.map((company) => (
+                  <option key={company.id} value={company.id}>
+                    {company.name}
+                  </option>
+                ))}
+              </select>
+            )}
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, Copy, FileText, Calendar } from 'lucide-react';
+import { Plus, Edit2, Trash2, Copy, FileText, Calendar, Building2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useCompany } from '../../contexts/CompanyContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -17,7 +17,7 @@ interface EventOrderTemplatesPageProps {
 }
 
 export default function EventOrderTemplatesPage({ onTabChange }: EventOrderTemplatesPageProps) {
-  const { currentCompany } = useCompany();
+  const { currentCompany, companies, switchCompany } = useCompany();
   const { user } = useAuth();
   const [templates, setTemplates] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -138,18 +138,40 @@ export default function EventOrderTemplatesPage({ onTabChange }: EventOrderTempl
         <div className="flex-1">
           <h2 className="text-xl font-semibold text-slate-900">Event Order Templates</h2>
         </div>
-        {canEdit && (
-          <button
-            onClick={() => {
-              setEditingTemplate(null);
-              setShowModal(true);
-            }}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 whitespace-nowrap"
-          >
-            <Plus className="h-5 w-5" />
-            New Template
-          </button>
-        )}
+        <div className="flex items-center gap-3">
+          {companies.length > 1 && (
+            <div className="flex items-center gap-2">
+              <Building2 className="w-4 h-4 text-slate-600" />
+              <select
+                value={currentCompany?.id || ''}
+                onChange={(e) => {
+                  if (e.target.value && switchCompany) {
+                    switchCompany(e.target.value);
+                  }
+                }}
+                className="px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-900 focus:border-transparent text-sm"
+              >
+                {companies.map((company) => (
+                  <option key={company.id} value={company.id}>
+                    {company.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+          {canEdit && (
+            <button
+              onClick={() => {
+                setEditingTemplate(null);
+                setShowModal(true);
+              }}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 whitespace-nowrap"
+            >
+              <Plus className="h-5 w-5" />
+              New Template
+            </button>
+          )}
+        </div>
       </div>
 
       {templates.length === 0 ? (

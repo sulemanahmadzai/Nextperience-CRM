@@ -3,7 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { useCompany } from '../../contexts/CompanyContext';
 import { useAuth } from '../../contexts/AuthContext';
 import type { Lead, PipelineStage, Customer } from '../../lib/database.types';
-import { Plus, Mail, Phone, User, Edit2, Trash2, Eye, X, Users, Search, ArrowUpDown, Calendar, Lock } from 'lucide-react';
+import { Plus, Mail, Phone, User, Edit2, Trash2, Eye, X, Users, Search, ArrowUpDown, Calendar, Lock, Building2 } from 'lucide-react';
 import { LeadModal } from './LeadModal';
 import { getUserPermissions, canDeleteLead, logAuditAction, type UserPermissions } from '../../lib/permissions';
 
@@ -18,7 +18,7 @@ interface LeadsKanbanProps {
 }
 
 export function LeadsKanban({ onViewLead, onViewCalendar }: LeadsKanbanProps) {
-  const { currentCompany, permissions } = useCompany();
+  const { currentCompany, companies, permissions, switchCompany } = useCompany();
   const { user } = useAuth();
   const [leads, setLeads] = useState<LeadWithCustomer[]>([]);
   const [stages, setStages] = useState<PipelineStage[]>([]);
@@ -489,6 +489,28 @@ export function LeadsKanban({ onViewLead, onViewCalendar }: LeadsKanbanProps) {
         </div>
 
         <div className="flex items-center gap-4 flex-wrap">
+          {companies.length > 1 && (
+            <div className="flex items-center gap-2">
+              <Building2 className="w-4 h-4 text-slate-600" />
+              <label className="text-sm text-slate-600 whitespace-nowrap">Business Unit:</label>
+              <select
+                value={currentCompany?.id || ''}
+                onChange={(e) => {
+                  if (e.target.value && switchCompany) {
+                    switchCompany(e.target.value);
+                  }
+                }}
+                className="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-slate-900 focus:border-transparent"
+              >
+                {companies.map((company) => (
+                  <option key={company.id} value={company.id}>
+                    {company.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <div className="flex items-center gap-2">
             <label className="text-sm text-slate-600 whitespace-nowrap">Created:</label>
             <select

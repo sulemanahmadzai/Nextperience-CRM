@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { FileText, Eye, Search, Filter, Plus, AlertCircle } from 'lucide-react';
+import { FileText, Eye, Search, Filter, Plus, AlertCircle, Building2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useCompany } from '../../contexts/CompanyContext';
 import { Quotation } from '../../lib/database.types';
@@ -19,7 +19,7 @@ interface QuotationsPageProps {
 }
 
 export default function QuotationsPage({ onViewQuotation }: QuotationsPageProps) {
-  const { currentCompany, permissions } = useCompany();
+  const { currentCompany, companies, permissions, switchCompany } = useCompany();
   const [quotations, setQuotations] = useState<QuotationWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -261,6 +261,23 @@ export default function QuotationsPage({ onViewQuotation }: QuotationsPageProps)
                 <Filter className="w-5 h-5 text-slate-400 flex-shrink-0" />
               </div>
               <div className="flex items-center gap-2 flex-wrap">
+                {companies.length > 1 && (
+                  <select
+                    value={currentCompany?.id || ''}
+                    onChange={(e) => {
+                      if (e.target.value && switchCompany) {
+                        switchCompany(e.target.value);
+                      }
+                    }}
+                    className="px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-900 focus:border-slate-900 text-sm flex items-center gap-2"
+                  >
+                    {companies.map((company) => (
+                      <option key={company.id} value={company.id}>
+                        {company.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
                 <select
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { FileText, Plus, Edit2, Trash2, Search } from 'lucide-react';
+import { FileText, Plus, Edit2, Trash2, Search, Building2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useCompany } from '../../contexts/CompanyContext';
 
@@ -14,7 +14,7 @@ interface ProformaInvoiceTemplate {
 }
 
 export function ProformaInvoiceTemplatesPage() {
-  const { currentCompany, permissions } = useCompany();
+  const { currentCompany, companies, permissions, switchCompany } = useCompany();
   const [templates, setTemplates] = useState<ProformaInvoiceTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -86,6 +86,26 @@ export function ProformaInvoiceTemplatesPage() {
             className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-900 focus:border-transparent"
           />
         </div>
+        {companies.length > 1 && (
+          <div className="flex items-center gap-2">
+            <Building2 className="w-4 h-4 text-slate-600" />
+            <select
+              value={currentCompany?.id || ''}
+              onChange={(e) => {
+                if (e.target.value && switchCompany) {
+                  switchCompany(e.target.value);
+                }
+              }}
+              className="px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-900 focus:border-transparent text-sm"
+            >
+              {companies.map((company) => (
+                <option key={company.id} value={company.id}>
+                  {company.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <label className="flex items-center gap-2 text-sm text-slate-700">
           <input
             type="checkbox"

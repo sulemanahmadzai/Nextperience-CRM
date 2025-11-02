@@ -2,11 +2,11 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useCompany } from '../../contexts/CompanyContext';
 import type { Customer } from '../../lib/database.types';
-import { Plus, Search, Mail, Phone, Building, Calendar } from 'lucide-react';
+import { Plus, Search, Mail, Phone, Building, Calendar, Building2 } from 'lucide-react';
 import { CustomerModal } from './CustomerModal';
 
 export function CustomersList() {
-  const { currentCompany, permissions } = useCompany();
+  const { currentCompany, companies, permissions, switchCompany } = useCompany();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -88,15 +88,37 @@ export function CustomersList() {
       </div>
 
       <div className="mb-6">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search customers by name, email, or phone..."
-            className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-900 focus:border-transparent"
-          />
+        <div className="flex items-center gap-4">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search customers by name, email, or phone..."
+              className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-900 focus:border-transparent"
+            />
+          </div>
+          {companies.length > 1 && (
+            <div className="flex items-center gap-2">
+              <Building2 className="w-4 h-4 text-slate-600" />
+              <select
+                value={currentCompany?.id || ''}
+                onChange={(e) => {
+                  if (e.target.value && switchCompany) {
+                    switchCompany(e.target.value);
+                  }
+                }}
+                className="px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-900 focus:border-transparent"
+              >
+                {companies.map((company) => (
+                  <option key={company.id} value={company.id}>
+                    {company.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
       </div>
 
