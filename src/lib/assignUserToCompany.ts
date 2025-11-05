@@ -1,10 +1,10 @@
 import { supabase } from './supabase';
 
 const DEFAULT_COMPANY_ID = '00000000-0000-0000-0000-000000000001'; // The Nextperience Group
-const ADMIN_ROLE_ID = '10000000-0000-0000-0000-000000000001'; // Admin role
+const VIEWER_ROLE_ID = '10000000-0000-0000-0000-000000000004'; // Viewer role
 
 /**
- * Assigns a user to the default company with Admin role
+ * Assigns the current user to the default company with Viewer role
  * Uses the SECURITY DEFINER function to bypass RLS
  */
 export async function assignCurrentUserToDefaultCompany(): Promise<{
@@ -26,13 +26,13 @@ export async function assignCurrentUserToDefaultCompany(): Promise<{
       userId: user.id,
       userEmail: user.email,
       companyId: DEFAULT_COMPANY_ID,
-      roleId: ADMIN_ROLE_ID
+      roleId: VIEWER_ROLE_ID
     });
 
     const { data, error } = await supabase.rpc('assign_user_to_company_role', {
       p_user_id: user.id,
       p_company_id: DEFAULT_COMPANY_ID,
-      p_role_id: ADMIN_ROLE_ID
+      p_role_id: VIEWER_ROLE_ID
     });
 
     if (error) {

@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
+import { assignCurrentUserToDefaultCompany } from '../lib/assignUserToCompany';
 
 interface AuthContextType {
   user: User | null;
@@ -31,7 +32,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.log('[AuthContext] Initial session check complete');
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('[AuthContext] Auth state changed:', {
         event,
         hasSession: !!session,
@@ -39,6 +40,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         userEmail: session?.user?.email
       });
       setUser(session?.user ?? null);
+
+      // Auto-assign newly authenticated users to default company as Viewer
+      try {
+        if (event === 'SIGNED_IN' && session?.user?.id) {
+          const { data: existing } = await supabase
+            .from('user_company_roles')
+            .select('id')
+            .eq('user_id', session.user.id)
+            .limit(1);
+
+          if (!existing || existing.length === 0) {
+            console.log('[AuthContext] No company assignment found. Auto-assigning to default company (Viewer)...');
+            await assignCurrentUserToDefaultCompany();
+          }
+        }
+      } catch (e) {
+        console.warn('[AuthContext] Auto-assign failed (non-fatal):', e);
+      }
     });
 
     return () => {

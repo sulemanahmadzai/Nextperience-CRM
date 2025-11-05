@@ -24,7 +24,7 @@ export default function EmailComposerModal({
 }: EmailComposerModalProps) {
   const { user } = useAuth();
   const { currentCompany } = useCompany();
-  const { isConnected, sendEmail } = useGoogleAuth();
+  const { isConnected, sendEmail, connectGoogle } = useGoogleAuth();
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{
     type: "success" | "error";
@@ -152,14 +152,8 @@ ${currentCompany?.name || "Our Company"}`,
   });
 
   const openGoogleConnect = () => {
-    const url = `${
-      import.meta.env.VITE_SUPABASE_URL
-    }/functions/v1/google-oauth-start`;
-    window.open(
-      url,
-      "google-oauth",
-      "width=520,height=640,menubar=no,toolbar=no,location=no,status=no"
-    );
+    // Use context method so Authorization header is sent and redirect is handled
+    connectGoogle();
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
